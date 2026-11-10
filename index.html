@@ -1,73 +1,264 @@
--- Stock Manager: run this whole file once in Supabase > SQL Editor
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stock Manager</title>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f0;--surface:#fff;--ink:#14282b;--muted:#5b6f72;--line:#d3dcda;--accent:#0f766e;--accent-ink:#fff;--warn:#b45309;--warn-bg:#fdf0dc;--bad:#b42318;--bad-bg:#fde7e4;--ok-bg:#dff3ee;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1a1c;--surface:#172427;--ink:#e6efee;--muted:#93a9ab;--line:#2b3d40;--accent:#2dd4bf;--accent-ink:#06211e;--warn:#fbbf6a;--warn-bg:#3a2a12;--bad:#ff9a8f;--bad-bg:#40191a;--ok-bg:#12372f;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0f1a1c;--surface:#172427;--ink:#e6efee;--muted:#93a9ab;--line:#2b3d40;--accent:#2dd4bf;--accent-ink:#06211e;--warn:#fbbf6a;--warn-bg:#3a2a12;--bad:#ff9a8f;--bad-bg:#40191a;--ok-bg:#12372f;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 "Public Sans",system-ui,Segoe UI,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+h1{font-size:26px;margin:0;font-weight:700;letter-spacing:-.01em}
+h1 small{display:block;font-size:13px;font-weight:400;color:var(--muted);letter-spacing:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:1px solid var(--line);background:var(--surface);padding:8px 14px;border-radius:6px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.danger{color:var(--bad)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;margin-bottom:16px}
+.stat{padding:14px 18px;border-right:1px solid var(--line)}
+.stat:last-child{border-right:0}
+.stat b{display:block;font-size:28px;font-weight:700;line-height:1.15}
+.stat span{font-size:13px;color:var(--muted)}
+.stat.alert b{color:var(--warn)}
+.tools{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.tools input,.tools select,dialog input,dialog select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+.tools input[type=search]{flex:1;min-width:200px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{padding:10px 14px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-weight:600;font-size:13px;color:var(--muted);cursor:pointer;user-select:none;background:var(--surface)}
+th[aria-sort]::after{content:" ▲"}
+th[aria-sort=descending]::after{content:" ▼"}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+.name b{font-weight:600}
+.name small{display:block;color:var(--muted);font-size:12.5px}
+.level{display:flex;align-items:center;gap:10px;min-width:170px}
+.bar{flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--accent)}
+.low .bar i{background:var(--warn)}.out .bar i{background:var(--bad)}
+.tag{font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--ok-bg);color:var(--accent)}
+.low .tag{background:var(--warn-bg);color:var(--warn)}
+.out .tag{background:var(--bad-bg);color:var(--bad)}
+.acts{display:flex;gap:6px;justify-content:flex-end}
+.acts .btn{padding:3px 10px;min-width:34px}
+.empty{padding:36px 16px;text-align:center;color:var(--muted)}
+h2{font-size:16px;margin:26px 0 10px}
+.log{list-style:none;margin:0;padding:0}
+.log li{display:flex;gap:14px;padding:9px 14px;border-bottom:1px solid var(--line);font-size:14px}
+.log li:last-child{border-bottom:0}
+.log time{color:var(--muted);min-width:96px}
+.log .d{font-weight:700;min-width:38px}
+.d.pos{color:var(--accent)}.d.neg{color:var(--warn)}
+dialog{border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);padding:0;width:min(460px,92vw)}
+dialog::backdrop{background:rgba(10,20,22,.5)}
+dialog form{padding:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+dialog h3{grid-column:1/-1;margin:0;font-size:18px}
+label{display:grid;gap:4px;font-size:13px;color:var(--muted)}
+label.full{grid-column:1/-1}
+dialog .row{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;margin-top:6px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:6px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Stock manager<small>Track items, quantities and movements</small></h1>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="outBtn">Sign out</button>
+      <button class="btn" id="exportBtn">Export CSV</button>
+      <button class="btn primary" id="addBtn">Add item</button>
+    </div>
+  </header>
 
-create table public.items (
-  id uuid primary key default gen_random_uuid(),
-  sku text not null unique,
-  name text not null,
-  category text not null,
-  location text not null default '',
-  qty integer not null default 0 check (qty >= 0),
-  reorder_level integer not null default 5 check (reorder_level >= 0),
-  price numeric(12,2) not null default 0 check (price >= 0),
-  created_at timestamptz not null default now()
-);
+  <section class="stats" id="stats" aria-label="Summary"></section>
 
-create table public.movements (
-  id bigint generated always as identity primary key,
-  item_id uuid references public.items(id) on delete set null,
-  item_name text not null,
-  delta integer not null,
-  note text,
-  created_by uuid default auth.uid(),
-  created_at timestamptz not null default now()
-);
-create index movements_created_idx on public.movements (created_at desc);
+  <div class="tools">
+    <input type="search" id="q" placeholder="Search by name, SKU or location" aria-label="Search items">
+    <select id="cat" aria-label="Filter by category"></select>
+    <select id="st" aria-label="Filter by status">
+      <option value="">All stock levels</option>
+      <option value="low">Low stock</option>
+      <option value="out">Out of stock</option>
+      <option value="ok">In stock</option>
+    </select>
+  </div>
 
--- Row Level Security: only signed-in users can touch data
-alter table public.items enable row level security;
-alter table public.movements enable row level security;
-revoke all on public.items, public.movements from anon;
+  <div class="panel scroll">
+    <table>
+      <thead><tr id="head">
+        <th data-k="name">Item</th><th data-k="category">Category</th><th data-k="location">Location</th>
+        <th data-k="qty" class="num">Quantity</th><th data-k="price" class="num">Unit price</th><th>Stock level</th><th></th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" hidden>No items match. Clear the filters or add a new item.</div>
+  </div>
 
-create policy "signed-in users manage items" on public.items
-  for all to authenticated using (true) with check (true);
-create policy "signed-in users read movements" on public.movements
-  for select to authenticated using (true);
+  <h2>Recent movements</h2>
+  <ul class="panel log" id="log"></ul>
+</div>
 
--- Every stock change is logged automatically (clients cannot write movements directly)
-create or replace function public.log_item_change() returns trigger
-language plpgsql security definer set search_path = public as $$
-declare n text := nullif(current_setting('app.note', true), '');
-begin
-  if tg_op = 'INSERT' then
-    insert into movements (item_id, item_name, delta, note) values (new.id, new.name, new.qty, 'New item added');
-  elsif tg_op = 'UPDATE' then
-    if new.qty <> old.qty then
-      insert into movements (item_id, item_name, delta, note)
-      values (new.id, new.name, new.qty - old.qty, coalesce(n, 'Quantity edited'));
-    end if;
-  else
-    insert into movements (item_id, item_name, delta, note) values (null, old.name, 0, 'Item deleted');
-  end if;
-  return coalesce(new, old);
-end $$;
+<dialog id="dlg">
+  <form method="dialog" id="form">
+    <h3 id="dtitle">Add item</h3>
+    <label class="full">Item name<input name="name" required></label>
+    <label>SKU<input name="sku" required></label>
+    <label>Category<input name="category" list="cats" required></label>
+    <datalist id="cats"></datalist>
+    <label>Location<input name="location" placeholder="e.g. Aisle 2, Shelf B"></label>
+    <label>Unit price<input name="price" type="number" min="0" step="0.01" value="0"></label>
+    <label>Quantity on hand<input name="qty" type="number" min="0" step="1" value="0" required></label>
+    <label>Reorder level<input name="min" type="number" min="0" step="1" value="5" required></label>
+    <div class="row">
+      <button type="button" class="btn danger" id="delBtn" hidden>Delete item</button>
+      <button type="button" class="btn" id="cancelBtn">Cancel</button>
+      <button type="submit" class="btn primary">Save item</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="auth">
+  <form id="authForm">
+    <h3>Sign in to Stock manager</h3>
+    <label class="full">Email<input name="email" type="email" required autocomplete="username"></label>
+    <label class="full">Password<input name="password" type="password" required autocomplete="current-password"></label>
+    <p id="authErr" style="grid-column:1/-1;margin:0;color:var(--bad);font-size:13px"></p>
+    <div class="row"><button type="submit" class="btn primary">Sign in</button></div>
+  </form>
+</dialog>
+<div id="toast" role="status"></div>
 
-create trigger items_log after insert or update or delete on public.items
-  for each row execute function public.log_item_change();
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+(function(){
+var SUPABASE_URL="https://YOUR-PROJECT.supabase.co",SUPABASE_KEY="YOUR-ANON-OR-PUBLISHABLE-KEY";
+var sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+var S={items:[],log:[]};
+var sort={k:"name",dir:1},editId=null;
+var $=function(id){return document.getElementById(id)};
+function status(i){return i.qty<=0?"out":(i.qty<=i.min?"low":"ok")}
+function money(n){return Number(n).toLocaleString(undefined,{style:"currency",currency:"USD"})}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function toast(m){var t=$("toast");t.textContent=m;t.className="on";clearTimeout(toast.h);toast.h=setTimeout(function(){t.className=""},1800)}
+function load(){
+  return Promise.all([
+    sb.from("items").select("*").order("name"),
+    sb.from("movements").select("*").order("created_at",{ascending:false}).limit(8)
+  ]).then(function(r){
+    var err=r[0].error||r[1].error;if(err){toast(err.message);return}
+    S.items=r[0].data.map(function(i){return{id:i.id,sku:i.sku,name:i.name,category:i.category,location:i.location||"",qty:i.qty,min:i.reorder_level,price:Number(i.price)}});
+    S.log=r[1].data.map(function(m){return{t:new Date(m.created_at).getTime(),name:m.item_name,delta:m.delta,note:m.note}});
+    render();
+  });
+}
 
--- Atomic +/- adjustment (safe when several people edit at once)
-create or replace function public.adjust_stock(p_item uuid, p_delta integer, p_note text default null)
-returns void language plpgsql as $$
-begin
-  perform set_config('app.note', coalesce(p_note, ''), true);
-  update public.items set qty = qty + p_delta where id = p_item;
-  if not found then raise exception 'Item not found'; end if;
-end $$;
-revoke execute on function public.adjust_stock(uuid, integer, text) from public, anon;
-grant execute on function public.adjust_stock(uuid, integer, text) to authenticated;
+function render(){
+  var items=S.items,units=0,val=0,low=0;
+  items.forEach(function(i){units+=i.qty;val+=i.qty*i.price;if(status(i)!=="ok")low++});
+  $("stats").innerHTML='<div class="stat"><b>'+items.length+'</b><span>Items tracked</span></div>'+
+   '<div class="stat"><b>'+units.toLocaleString()+'</b><span>Units on hand</span></div>'+
+   '<div class="stat"><b>'+money(val)+'</b><span>Stock value</span></div>'+
+   '<div class="stat'+(low?' alert':'')+'"><b>'+low+'</b><span>Need reordering</span></div>';
+  var cats=Array.from(new Set(items.map(function(i){return i.category}))).sort(),cur=$("cat").value;
+  $("cat").innerHTML='<option value="">All categories</option>'+cats.map(function(c){return'<option'+(c===cur?' selected':'')+'>'+esc(c)+'</option>'}).join("");
+  $("cats").innerHTML=cats.map(function(c){return'<option value="'+esc(c)+'">'}).join("");
+  var q=$("q").value.toLowerCase(),c=$("cat").value,st=$("st").value;
+  var list=items.filter(function(i){
+    return (!q||(i.name+i.sku+i.location).toLowerCase().indexOf(q)>-1)&&(!c||i.category===c)&&(!st||status(i)===st)
+  }).sort(function(a,b){var x=a[sort.k],y=b[sort.k];return (typeof x==="number"?x-y:String(x).localeCompare(String(y)))*sort.dir});
+  $("rows").innerHTML=list.map(function(i){
+    var s=status(i),cap=Math.max(i.min*2,i.qty,1),pct=Math.min(100,Math.round(i.qty/cap*100));
+    var label=s==="out"?"Out of stock":s==="low"?"Low stock":"In stock";
+    return '<tr class="'+s+'"><td class="name"><b>'+esc(i.name)+'</b><small>'+esc(i.sku)+'</small></td>'+
+     '<td>'+esc(i.category)+'</td><td>'+esc(i.location||"—")+'</td>'+
+     '<td class="num"><b>'+i.qty+'</b></td><td class="num">'+money(i.price)+'</td>'+
+     '<td><div class="level"><div class="bar"><i style="width:'+pct+'%"></i></div><span class="tag">'+label+'</span></div></td>'+
+     '<td><div class="acts"><button class="btn" data-a="out" data-id="'+i.id+'" aria-label="Issue one '+esc(i.name)+'">−1</button>'+
+     '<button class="btn" data-a="in" data-id="'+i.id+'" aria-label="Receive one '+esc(i.name)+'">+1</button>'+
+     '<button class="btn" data-a="edit" data-id="'+i.id+'">Edit</button></div></td></tr>';
+  }).join("");
+  $("empty").hidden=list.length>0;
+  Array.prototype.forEach.call($("head").children,function(th){
+    if(th.dataset.k===sort.k)th.setAttribute("aria-sort",sort.dir>0?"ascending":"descending");else th.removeAttribute("aria-sort")
+  });
+  $("log").innerHTML=S.log.length?S.log.slice(0,8).map(function(m){
+    var d=new Date(m.t),cls=m.delta>0?"pos":m.delta<0?"neg":"";
+    return '<li><time>'+d.toLocaleDateString(undefined,{day:"numeric",month:"short"})+', '+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+'</time><span class="d '+cls+'">'+(m.delta>0?"+":"")+(m.delta||"")+'</span><span>'+esc(m.name)+(m.note?' — '+esc(m.note):'')+'</span></li>'
+  }).join(""):'<li>No movements yet. Use −1 and +1 on an item to record stock changes.</li>';
+}
 
--- Optional sample data
-insert into public.items (sku, name, category, location, qty, reorder_level, price) values
- ('CBL-HDMI-2M','HDMI cable 2 m','Cables','Aisle 1, Bin A',42,15,4.50),
- ('DSP-43-4K','43-inch 4K display','Displays','Aisle 4, Rack 1',6,4,185),
- ('MNT-WALL-L','Wall mount, large','Mounts','Aisle 2, Shelf C',3,10,12.75),
- ('PWR-ADP-12V','12 V power adapter','Power','Aisle 1, Bin D',0,12,6.20);
+function openForm(id){
+  editId=id;var f=$("form"),i=id?S.items.filter(function(x){return x.id===id})[0]:null;
+  $("dtitle").textContent=i?"Edit item":"Add item";
+  ["name","sku","category","location","price","qty","min"].forEach(function(k){f.elements[k].value=i?i[k]:(k==="price"||k==="qty"?0:k==="min"?5:"")});
+  $("delBtn").hidden=!i;$("dlg").showModal();
+}
+$("addBtn").onclick=function(){openForm(null)};
+$("cancelBtn").onclick=function(){$("dlg").close()};
+$("form").onsubmit=function(e){
+  e.preventDefault();var f=e.target,v=function(k){return f.elements[k].value.trim()};
+  var rec={name:v("name"),sku:v("sku"),category:v("category"),location:v("location"),price:parseFloat(v("price"))||0,qty:Math.max(0,parseInt(v("qty"),10)||0),reorder_level:Math.max(0,parseInt(v("min"),10)||0)};
+  var wasEdit=!!editId,q=wasEdit?sb.from("items").update(rec).eq("id",editId):sb.from("items").insert(rec);
+  q.then(function(r){
+    if(r.error){toast(r.error.code==="23505"?"That SKU already exists":r.error.message);return}
+    $("dlg").close();toast(wasEdit?"Item saved":"Item added");load();
+  });
+};
+$("delBtn").onclick=function(){
+  var i=S.items.filter(function(x){return x.id===editId})[0];
+  if(i&&confirm("Delete "+i.name+"? This can’t be undone.")){
+    sb.from("items").delete().eq("id",editId).then(function(r){
+      if(r.error){toast(r.error.message);return}
+      $("dlg").close();toast("Item deleted");load();
+    });
+  }
+};
+$("rows").onclick=function(e){
+  var b=e.target.closest("button");if(!b)return;
+  var id=b.dataset.id;
+  if(b.dataset.a==="edit")return openForm(id);
+  var i=S.items.filter(function(x){return x.id===id})[0],d=b.dataset.a==="in"?1:-1;
+  if(i.qty+d<0){toast("Already out of stock");return}
+  sb.rpc("adjust_stock",{p_item:id,p_delta:d,p_note:d>0?"Received":"Issued"}).then(function(r){
+    if(r.error)toast(r.error.message);else load();
+  });
+};
+$("head").onclick=function(e){
+  var k=e.target.dataset.k;if(!k)return;
+  sort.dir=sort.k===k?-sort.dir:1;sort.k=k;render();
+};
+["q","cat","st"].forEach(function(id){$(id).oninput=render});
+$("exportBtn").onclick=function(){
+  var rows=[["SKU","Name","Category","Location","Quantity","Reorder level","Unit price"]].concat(S.items.map(function(i){return[i.sku,i.name,i.category,i.location,i.qty,i.min,i.price]}));
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c).replace(/"/g,'""')+'"'}).join(",")}).join("\n");
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="stock.csv";document.body.appendChild(a);a.click();a.remove();
+};
+$("auth").addEventListener("cancel",function(e){e.preventDefault()});
+$("authForm").onsubmit=function(e){
+  e.preventDefault();var f=e.target;
+  sb.auth.signInWithPassword({email:f.elements.email.value,password:f.elements.password.value}).then(function(r){
+    if(r.error){$("authErr").textContent=r.error.message;return}
+    $("authErr").textContent="";f.reset();$("auth").close();load();
+  });
+};
+$("outBtn").onclick=function(){
+  sb.auth.signOut().then(function(){S={items:[],log:[]};render();$("auth").showModal()});
+};
+render();
+sb.auth.getSession().then(function(r){if(r.data.session)load();else $("auth").showModal()});
+})();
+</script>
+</body>
+</html>
