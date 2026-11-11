@@ -248,9 +248,7 @@ function render(){
      '<td>'+esc(i.category)+'</td><td>'+esc(i.location||"—")+'</td>'+
      '<td class="num"><b>'+i.qty+'</b></td><td class="num">'+money(i.price)+'</td>'+
      '<td><div class="level"><div class="bar"><i style="width:'+pct+'%"></i></div><span class="tag">'+label+'</span></div></td>'+
-     '<td><div class="acts"><button class="btn" data-a="out" data-id="'+i.id+'" aria-label="Issue one '+esc(i.name)+'">−1</button>'+
-     '<button class="btn" data-a="in" data-id="'+i.id+'" aria-label="Receive one '+esc(i.name)+'">+1</button>'+
-     '<button class="btn" data-a="sell" data-id="'+i.id+'">Sell</button>'+
+     '<td><div class="acts"><button class="btn" data-a="sell" data-id="'+i.id+'">Sell</button>'+
      '<button class="btn" data-a="edit" data-id="'+i.id+'">Edit</button></div></td></tr>';
   }).join("");
   $("empty").hidden=list.length>0;
@@ -260,7 +258,7 @@ function render(){
   $("log").innerHTML=S.log.length?S.log.slice(0,8).map(function(m){
     var d=new Date(m.t),cls=m.delta>0?"pos":m.delta<0?"neg":"";
     return '<li><time>'+d.toLocaleDateString(undefined,{day:"numeric",month:"short"})+', '+d.toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})+'</time><span class="d '+cls+'">'+(m.delta>0?"+":"")+(m.delta||"")+'</span><span>'+esc(m.name)+(m.note?' — '+esc(m.note):'')+'</span></li>'
-  }).join(""):'<li>No movements yet. Use −1 and +1 on an item to record stock changes.</li>';
+  }).join(""):'<li>No movements yet. Add, edit or sell items to record stock changes.</li>';
 }
 
 function openForm(id){
@@ -294,11 +292,6 @@ $("rows").onclick=function(e){
   var id=b.dataset.id;
   if(b.dataset.a==="edit")return openForm(id);
   if(b.dataset.a==="sell")return openSell(id);
-  var i=S.items.filter(function(x){return x.id===id})[0],d=b.dataset.a==="in"?1:-1;
-  if(i.qty+d<0){toast("Already out of stock");return}
-  sb.rpc("adjust_stock",{p_item:id,p_delta:d,p_note:d>0?"Received":"Issued"}).then(function(r){
-    if(r.error)toast(r.error.message);else load();
-  });
 };
 $("head").onclick=function(e){
   var k=e.target.dataset.k;if(!k)return;
