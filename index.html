@@ -109,6 +109,17 @@ dialog .row{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;margi
 
   <h2>Recent movements</h2>
   <ul class="panel log" id="log"></ul>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <h2>Recent sales</h2><button class="btn" id="salesExport">Export sales CSV</button>
+  </div>
+  <div class="panel scroll">
+    <table style="min-width:820px">
+      <thead><tr><th>Date</th><th>Item</th><th class="num">Qty</th><th>Sold to</th><th>PO number</th><th>PO date</th><th class="num">Total</th></tr></thead>
+      <tbody id="sales"></tbody>
+    </table>
+    <div class="empty" id="salesEmpty" hidden>No sales recorded yet. Use Sell on an item.</div>
+  </div>
 </div>
 
 <dialog id="dlg">
@@ -126,6 +137,22 @@ dialog .row{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end;margi
       <button type="button" class="btn danger" id="delBtn" hidden>Delete item</button>
       <button type="button" class="btn" id="cancelBtn">Cancel</button>
       <button type="submit" class="btn primary">Save item</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="sellDlg">
+  <form id="sellForm">
+    <h3>Sell item</h3>
+    <p id="sellInfo" style="grid-column:1/-1;margin:0;color:var(--muted);font-size:13px"></p>
+    <label class="full">Sold to (customer)<input name="customer" required autocomplete="off"></label>
+    <label>Quantity<input name="qty" type="number" min="1" step="1" required></label>
+    <label>Unit price<input name="price" type="number" min="0" step="0.01" required></label>
+    <label>PO number<input name="po_number" autocomplete="off"></label>
+    <label>PO date<input name="po_date" type="date"></label>
+    <label class="full">Notes<input name="notes" placeholder="Delivery, payment terms, etc."></label>
+    <div class="row">
+      <button type="button" class="btn" id="sellCancel">Cancel</button>
+      <button type="submit" class="btn primary">Record sale</button>
     </div>
   </form>
 </dialog>
@@ -152,15 +179,51 @@ function status(i){return i.qty<=0?"out":(i.qty<=i.min?"low":"ok")}
 function money(n){return Number(n).toLocaleString(undefined,{style:"currency",currency:"USD"})}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function toast(m){var t=$("toast");t.textContent=m;t.className="on";clearTimeout(toast.h);toast.h=setTimeout(function(){t.className=""},1800)}
+function renderSales(){
+  var list=S.sales||[];
+  $("sales").innerHTML=list.map(function(x){
+    var d=new Date(x.created_at);
+    return '<tr><td>'+d.toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})+'</td>'+
+     '<td class="name"><b>'+esc(x.item_name)+'</b><small>'+esc(x.sku||"")+'</small></td>'+
+     '<td class="num">'+x.qty+'</td><td>'+esc(x.customer)+'</td><td>'+esc(x.po_number||"—")+'</td>'+
+     '<td>'+(x.po_date?new Date(x.po_date+"T00:00:00").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"}):"—")+'</td>'+
+     '<td class="num">'+money(x.qty*x.unit_price)+'</td></tr>'
+  }).join("");
+  $("salesEmpty").hidden=list.length>0;
+}
+var sellId=null;
+function openSell(id){
+  var i=S.items.filter(function(x){return x.id===id})[0];if(!i)return;
+  if(i.qty<1){toast("Nothing in stock to sell");return}
+  sellId=id;var f=$("sellForm");f.reset();
+  f.elements.qty.max=i.qty;f.elements.qty.value=1;f.elements.price.value=i.price;
+  $("sellInfo").textContent=i.name+" ("+i.sku+") — "+i.qty+" in stock";
+  $("sellDlg").showModal();
+}
+$("sellCancel").onclick=function(){$("sellDlg").close()};
+$("sellForm").onsubmit=function(e){
+  e.preventDefault();var f=e.target,v=function(k){return f.elements[k].value.trim()};
+  sb.rpc("sell_stock",{p_item:sellId,p_qty:parseInt(v("qty"),10),p_customer:v("customer"),p_po_number:v("po_number")||null,p_po_date:v("po_date")||null,p_price:parseFloat(v("price"))||0,p_notes:v("notes")||null}).then(function(r){
+    if(r.error){toast(r.error.message);return}
+    $("sellDlg").close();toast("Sale recorded");load();
+  });
+};
+$("salesExport").onclick=function(){
+  var rows=[["Date","SKU","Item","Qty","Unit price","Sold to","PO number","PO date","Notes"]].concat((S.sales||[]).map(function(x){return[x.created_at.slice(0,10),x.sku,x.item_name,x.qty,x.unit_price,x.customer,x.po_number,x.po_date,x.notes]}));
+  var csv=rows.map(function(r){return r.map(function(c){return'"'+String(c==null?"":c).replace(/"/g,'""')+'"'}).join(",")}).join("\n");
+  var a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download="sales.csv";document.body.appendChild(a);a.click();a.remove();
+};
 function load(){
   return Promise.all([
     sb.from("items").select("*").order("name"),
-    sb.from("movements").select("*").order("created_at",{ascending:false}).limit(8)
+    sb.from("movements").select("*").order("created_at",{ascending:false}).limit(8),
+    sb.from("sales").select("*").order("created_at",{ascending:false}).limit(25)
   ]).then(function(r){
-    var err=r[0].error||r[1].error;if(err){toast(err.message);return}
+    var err=r[0].error||r[1].error||r[2].error;if(err){toast(err.message);return}
     S.items=r[0].data.map(function(i){return{id:i.id,sku:i.sku,name:i.name,category:i.category,location:i.location||"",qty:i.qty,min:i.reorder_level,price:Number(i.price)}});
     S.log=r[1].data.map(function(m){return{t:new Date(m.created_at).getTime(),name:m.item_name,delta:m.delta,note:m.note}});
-    render();
+    S.sales=r[2].data;
+    render();renderSales();
   });
 }
 
@@ -187,6 +250,7 @@ function render(){
      '<td><div class="level"><div class="bar"><i style="width:'+pct+'%"></i></div><span class="tag">'+label+'</span></div></td>'+
      '<td><div class="acts"><button class="btn" data-a="out" data-id="'+i.id+'" aria-label="Issue one '+esc(i.name)+'">−1</button>'+
      '<button class="btn" data-a="in" data-id="'+i.id+'" aria-label="Receive one '+esc(i.name)+'">+1</button>'+
+     '<button class="btn" data-a="sell" data-id="'+i.id+'">Sell</button>'+
      '<button class="btn" data-a="edit" data-id="'+i.id+'">Edit</button></div></td></tr>';
   }).join("");
   $("empty").hidden=list.length>0;
@@ -229,6 +293,7 @@ $("rows").onclick=function(e){
   var b=e.target.closest("button");if(!b)return;
   var id=b.dataset.id;
   if(b.dataset.a==="edit")return openForm(id);
+  if(b.dataset.a==="sell")return openSell(id);
   var i=S.items.filter(function(x){return x.id===id})[0],d=b.dataset.a==="in"?1:-1;
   if(i.qty+d<0){toast("Already out of stock");return}
   sb.rpc("adjust_stock",{p_item:id,p_delta:d,p_note:d>0?"Received":"Issued"}).then(function(r){
@@ -254,7 +319,7 @@ $("authForm").onsubmit=function(e){
   });
 };
 $("outBtn").onclick=function(){
-  sb.auth.signOut().then(function(){S={items:[],log:[]};render();$("auth").showModal()});
+  sb.auth.signOut().then(function(){S={items:[],log:[],sales:[]};render();renderSales();$("auth").showModal()});
 };
 render();
 sb.auth.getSession().then(function(r){if(r.data.session)load();else $("auth").showModal()});
